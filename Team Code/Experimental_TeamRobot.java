@@ -1,5 +1,8 @@
 package org.firstinspires.ftc.teamcode;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import android.graphics.Color;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -20,7 +23,7 @@ import com.qualcomm.robotcore.hardware.Gyroscope;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 
-public class TeamRobot 
+public class Experimental_TeamRobot 
 {
     private static int CRANE_MAXIMUM_HEIGHT = 4356;
     private static double CRANE_MOVEMENT_SPEED_UP = 0.7;
@@ -42,7 +45,9 @@ public class TeamRobot
     private DcMotor m2;
     private DcMotor m3;
     private DcMotor driveMotors[];
-    
+
+    private List<String> telemetryMessages_list = new ArrayList<>();    
+    private String telemetryMessages_string="";
    
     double forwardPowers[] = new double[] {-1.0, -1.0, +1.0, +1.0};
     double backwardPowers[] = new double[] {+1.0, +1.0, -1.0, -1.0};
@@ -53,20 +58,21 @@ public class TeamRobot
     BNO055IMU imu;
     
     // Forward is zero, 360, etc
-    double totalDegreesTurned=0;
+    double totalDegreesTurned = 0;
+    Double desiredTotalDegreesTurned = null;
 
     // Remember the previous direction so we know how much we turned
-    double previousDirection=0;
+    double previousDirection = 0;
 
 
     NormalizedColorSensor colorSensor;
     NormalizedRGBA colors;
     final float[] hsvValues = new float[3];
     
-    OpMode opMode;
+    LinearOpMode opMode;
 
 
-    public TeamRobot(OpMode opMode)
+    public Experimental_TeamRobot(LinearOpMode opMode)
     {
         this.opMode = opMode;
         HardwareMap hardwareMap = opMode.hardwareMap;
@@ -97,10 +103,10 @@ public class TeamRobot
         colorSensor = hardwareMap.get(NormalizedColorSensor.class, "color");
         //colorSensor.enableLed(false);
 
-        opMode.telemetry.addData("Drive: ", "%s", this::getDriveTelemetry);
-        opMode.telemetry.addData("Color:", "%s", this::getColorTelemetry);
+        opMode.telemetry.addData("Drive", "%s", this::getDriveTelemetry);
+        opMode.telemetry.addData("Color", "%s", this::getColorTelemetry);
         
-        opMode.telemetry.addData("Crane:", "%s", this::getCraneTelemetry);
+        opMode.telemetry.addData("Crane", "%s", this::getCraneTelemetry);
 
         // Initialize IMU/Gyro
         imu = hardwareMap.get(BNO055IMU.class, "imu");
@@ -111,14 +117,26 @@ public class TeamRobot
         parameters.loggingTag = "IMU";
         imu.initialize(parameters);
         _getAngle1FromImu();
-        opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
+        opMode.telemetry.addData("IMU", "%s", this::getImuTelemetry);
+        
+        opMode.telemetry.addData("Messages", "\n%s", this::getTelemetryMessages);
     }
 
+    public boolean shouldWeKeepRunning() {
+        if (!opMode.opModeIsActive())
+            return false;
+        else
+            return true;
+    }
 
+    public void loop(String telemetryMessageFmt, Object... args) {
+        addTelemetryMessage(telemetryMessageFmt, args);
+        loop();
+    }
+    
+    
     public void loop()
     {
-        opMode.telemetry.update();
-        
         if (craneTouchSensor.isPressed() 
             || craneLiftMotor.getCurrentPosition() < craneLiftMotor_minPositionSeen)
         {
@@ -144,6 +162,18 @@ public class TeamRobot
             degChange = degChange + 360;
         totalDegreesTurned = totalDegreesTurned + degChange;
         previousDirection = currentDirection;
+
+        // Assemble telemetry messages
+        StringBuilder telemetryMessages_sb=new StringBuilder();
+        for (String message : telemetryMessages_list) {
+            if ( telemetryMessages_sb.length() != 0 )
+              telemetryMessages_sb.append("\n");
+            telemetryMessages_sb.append(message);
+        }
+        telemetryMessages_string = telemetryMessages_sb.toString();
+        telemetryMessages_list.clear();
+
+        opMode.telemetry.update();
     }
     
     public String getColorTelemetry() {
@@ -151,6 +181,18 @@ public class TeamRobot
         Color.colorToHSV(colors.toColor(), hsvValues);
         return String.format("\nRed: %4.3f Gre: %4.3f Blu: %4.3f \nHue: %4.1f Sat: %4.3f Val: %4.3f \nAlf: %4.3f\nZone: %d", 
             colors.red, colors.green, colors.blue, hsvValues[0], hsvValues[1], hsvValues[2], colors.alpha, findParkingZone());
+    }
+    
+    public String getTelemetryMessages() {
+        return telemetryMessages_string;
+    }
+    
+    public void addTelemetryMessage(String fmt, Object... args) {
+        try {
+            telemetryMessages_list.add(String.format(fmt, args));
+        } catch (Exception e) {
+            telemetryMessages_list.add(String.format("Bad format: %s: %s", fmt, e.getMessage()));
+        }
     }
     
     public int findParkingZone() {
@@ -251,19 +293,19 @@ public class TeamRobot
         int height_ticks = (int) (185.5 * height_inches) ; 
         if(height_ticks == 0){
             craneDown();
-            while(craneTouchSensor.isPressed()==false)
-                loop();
+            while(shouldWeKeepRunning() && craneTouchSensor.isPressed()==false)
+                loop("Lowering crane until button is pressed");
             craneStop();
         }
         else if(getCraneHeight() >= height_ticks){
             craneDown();
-            while(getCraneHeight() > height_ticks)
-                loop();
+            while(shouldWeKeepRunning() && getCraneHeight() > height_ticks)
+                loop("Lowering crane. %d ticks to go", getCraneHeight()-height_ticks);
             craneStop();
         } else {
             craneUp();
-            while(getCraneHeight() <= height_ticks)
-                loop();
+            while(shouldWeKeepRunning() && getCraneHeight() <= height_ticks)
+                loop("Raising crane. %d ticks to go", height_ticks-getCraneHeight());
             craneStop();
         }
     }
@@ -306,8 +348,8 @@ public class TeamRobot
         }
     }
     
-    //USE : applys moter powers and scales them
-    //GOAL : Shouldn't scale moter powers
+    //USE : applies moter powers and scales them
+    //GOAL : Shouldn't scale motor powers
     void setMotorPowers(double speedScale, double directionPowers[], double spinPowers[])
     {
         if (spinPowers == null)
@@ -315,6 +357,44 @@ public class TeamRobot
         if (directionPowers == null)
             directionPowers = new double[] {0.0, 0.0, 0.0, 0.0};
             
+        if(spinPowers[0] != 0.0){
+            // If a spin power is specified, then clear the desired heading
+            desiredTotalDegreesTurned=null;
+        } else {
+            // if no spin was specified by caller, see if spin is needed to achieve desired heading
+            if(desiredTotalDegreesTurned != null){
+                double spinDirectionForHeadingCorrection;
+                double spinPowerForHeadingCorrection;
+                double headingDifference = desiredTotalDegreesTurned - totalDegreesTurned;
+                if ( headingDifference>0 )
+                    // counter clockwise
+                    spinDirectionForHeadingCorrection=+1;
+                else
+                    // clockwise
+                    spinDirectionForHeadingCorrection=-1;
+
+                // scale the spinPower based on how much we need to turn
+                double headingErrorMagnitude=Math.abs(headingDifference);
+                if (headingErrorMagnitude < 0.5)
+                    // We're in the right spot
+                    spinPowerForHeadingCorrection = 0; 
+                else if ( headingErrorMagnitude > 30 ) 
+                    //  we have more than 30 degrees to turn... full power
+                    spinPowerForHeadingCorrection = 1.0;
+                else {
+                    // Scale correction linearly with a minimum
+                    spinPowerForHeadingCorrection = 1.0*headingErrorMagnitude/30;
+                    spinPowerForHeadingCorrection = Math.max(spinPowerForHeadingCorrection, 0.1);
+                }
+                
+                double spin=spinDirectionForHeadingCorrection*spinPowerForHeadingCorrection;
+                addTelemetryMessage("Heading correction: %+4.2f for %.1fdeg error",
+                    spin, headingDifference);
+                    
+                spinPowers= new double[] {spin,spin,spin,spin};
+            }
+        }
+        
         double max = 0.0;
         double tempMotorPowers[] = {0.0, 0.0, 0.0, 0.0};
         for(int i = 0; i < 4; i++)
@@ -364,10 +444,11 @@ public class TeamRobot
             
             long endTime = timeStarted + msec;
             
-            while (System.currentTimeMillis()<endTime) {
+            while (shouldWeKeepRunning() && System.currentTimeMillis()<endTime) {
                 double motorPowers[] = getMotorPowersForDirection(angle);
                 setMotorPowers(power, motorPowers, null);
-                loop();
+                loop("Moving at %.0f degrees with pow=%.2f. %.1f secs to go",
+                        angle, power, (1.0*endTime-System.currentTimeMillis())/1000);
             }
             
     }
@@ -376,22 +457,55 @@ public class TeamRobot
         moveForTime(angle, msec, 0.5);
     }
     
+    // counterclockwise is positive; clockwise is negative
     public void spin(double spinPower) {
         setMotorPowers(spinPower, null, new double[] {1,1,1,1});
     }
     
     public void turnForAngle(double turnAngle, double turnSpeed){
-        double startAngle = totalDegreesTurned;
+        if ( desiredTotalDegreesTurned == null )
+            desiredTotalDegreesTurned = totalDegreesTurned + turnAngle;
+        else
+            desiredTotalDegreesTurned += turnAngle;
         
-        if (turnAngle < 0) {
-            turnSpeed = turnSpeed * -1;
+        while (shouldWeKeepRunning() && Math.abs(getHeadingError()) > 2 ) {
+            // stop will only spin to correct the heading
+            stop();
+            loop("Turning %s dir. %.0f deg left", 
+                turnAngle>0 ? "CW" : "CCW",
+                Math.abs(getHeadingError()));
         }
-        spin(turnSpeed);
-        while (Math.abs(totalDegreesTurned - startAngle) < Math.abs(turnAngle))
-            loop();
-            
     }
     
+    // Set heading: 0--359.9
+    public void setDesiredHeading(double desiredHeading){
+        // This is based on totalDegreesTurned.
+        
+        // Find the closest number of times the robot has spun around
+        double fullRotations = Math.round(totalDegreesTurned/360);
+
+        // Because we're always adding the desiredHeading, 
+        // this may include an extra 360-degree rotations        
+        double possibleDesiredTotalDegreesTurned = 360.0*fullRotations + desiredHeading;
+        
+        // Remove extra 360 turns... we should always be within 180 degrees of 
+        // the desired heading, so add/subtract a rotation if we're too far away
+        if ( possibleDesiredTotalDegreesTurned-totalDegreesTurned > 180 )
+            possibleDesiredTotalDegreesTurned -= 360;
+        else if ( possibleDesiredTotalDegreesTurned-totalDegreesTurned < -180 )
+            possibleDesiredTotalDegreesTurned += 360;
+            
+        desiredTotalDegreesTurned = possibleDesiredTotalDegreesTurned;
+    }
+    
+    public double getHeadingError() {
+        if (desiredTotalDegreesTurned == null)
+            return 0;
+        else
+            return desiredTotalDegreesTurned - totalDegreesTurned;
+    }
+    
+    // Stop the robot's movement other than correcting for heading errors
     public void stop() {
         setMotorPowers(0, null, null);
     }
@@ -401,8 +515,9 @@ public class TeamRobot
             
             long endTime = timeStarted + msec;
             
-            while (System.currentTimeMillis()<endTime) {
-                loop();
+            while (shouldWeKeepRunning() && System.currentTimeMillis()<endTime) {
+                loop("Waiting for %.1fsec. %.1fsec left",
+                    1.0*msec/1000, (1.0*endTime-System.currentTimeMillis())/1000);
             }
             
     }
@@ -417,8 +532,11 @@ public class TeamRobot
 
         int distanceInTicks = (int) (distanceInInches * TICKS_PER_INCH);
         
-        while (m0.getCurrentPosition() > startPosition + distanceInTicks) {
-                loop();
+        int remainingTicks = Math.abs(m0.getCurrentPosition()-startPosition) - distanceInTicks;
+        while (shouldWeKeepRunning() && remainingTicks>0) {
+                loop("Moving for %.2finches (%d ticks) at %.0f degrees. %d ticks to go.",
+                    distanceInInches, distanceInTicks, angle, remainingTicks );
+                remainingTicks = Math.abs(m0.getCurrentPosition()-startPosition) - distanceInTicks;
         }
         setMotorPowers(0, null, null);
             
@@ -438,7 +556,7 @@ public class TeamRobot
     // [0,360) where 0 is 'North', 90 is 'West', 180 is 'South' and 270 is 'East'
     // North is defined to be the direction the robot was facing when it started
     // or reset to
-    public double getHeading() {
+    public double getCurrentHeading() {
         double heading=totalDegreesTurned % 360;
         if ( heading>=0 )
             return heading;
@@ -446,22 +564,48 @@ public class TeamRobot
             return heading+360;
     }
     
+    public void resetHeadingToClosestWaypoint() {
+        double hdg = getCurrentHeading();
+        
+        // Heading is from 0 to 359.9
+        if ( hdg <= 45 )
+            resetHeading_North();
+        else if ( hdg <= 135 )
+            resetHeading_West();
+        else if ( hdg <= 225 )
+            resetHeading_South();
+        else if ( hdg <= 315 )
+            resetHeading_East();
+        else
+            resetHeading_North();
+    }
+    
     public void resetHeading_North() {
+        totalDegreesTurned=0;
+        desiredTotalDegreesTurned=null;
     }
     
     public void resetHeading_South() {
+        totalDegreesTurned=180;
+        desiredTotalDegreesTurned=null;
     }
     
     public void resetHeading_East() {
+        totalDegreesTurned=270;
+        desiredTotalDegreesTurned=null;
     }
     
     public void resetHeading_West() {
+        totalDegreesTurned=90;
+        desiredTotalDegreesTurned=null;
     }
     
     public String getImuTelemetry() {
-        return String.format("TotalDegreesTurned=%+.0f | Heading=%.0f | A1=%.1f | A2=%.1f | A3=%.1f",
+        return String.format("TotalDeg=%+4.0f |Hdg: Cur=%3.0f|Goal=%s Err=%+3.0f|\nA1=%+.1f | A2=%+.1f | A3=%+.1f",
             totalDegreesTurned,
-            getHeading(),
+            getCurrentHeading(),
+            desiredTotalDegreesTurned == null ? "none" : String.format("%4.0f",desiredTotalDegreesTurned),
+            getHeadingError(),
             _getAngle1FromImu(),
             _getAngle2FromImu(),
             _getAngle3FromImu());
