@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import android.graphics.Color;
+
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -10,6 +12,9 @@ import com.qualcomm.robotcore.hardware.Blinker;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.hardware.ColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
+import com.qualcomm.robotcore.hardware.SwitchableLight;
 
 import com.qualcomm.robotcore.hardware.Gyroscope;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -47,7 +52,9 @@ public class TeamRobot
     // Gyro variables
     BNO055IMU imu;
     
-    ColorSensor color;
+    NormalizedColorSensor colorSensor;
+    NormalizedRGBA colors;
+    final float[] hsvValues = new float[3];
     
     OpMode opMode;
 
@@ -80,8 +87,8 @@ public class TeamRobot
         craneServo.setPosition(CRANE_SERVO_RELEASE);
         craneTouchSensor = hardwareMap.get(TouchSensor.class, "crane_touch");
        
-        color = hardwareMap.get(ColorSensor.class, "color");
-        color.enableLed(false);
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "color");
+        //colorSensor.enableLed(false);
 
         opMode.telemetry.addData("Drive: ", "%s", this::getDriveTelemetry);
         opMode.telemetry.addData("Color:", "%s", this::getColorTelemetry);
@@ -121,8 +128,10 @@ public class TeamRobot
     }
     
     public String getColorTelemetry() {
-        return String.format("R:%3d G:%3d B:%3d", 
-            color.red(), color.green(), color.blue());
+        colors = colorSensor.getNormalizedColors();
+        Color.colorToHSV(colors.toColor(), hsvValues);
+        return String.format("\nRed: %4.3f Gre: %4.3f Blu: %4.3f \nHue: %4.1f Sat: %4.3f Val: %4.3f \nAlf: %4.3f", 
+            colors.red, colors.green, colors.blue, hsvValues[0], hsvValues[1], hsvValues[2], colors.alpha);
     }
     
     public void craneSetCurrentPositionAsMinimum() {
@@ -300,10 +309,10 @@ public class TeamRobot
     
     public String getDriveTelemetry() {
         return String.format("M0: %.2f@%5d, M1: %.2f@%5d, M2: %.2f@%5d, M3: %.2f@%5d",
-            m0.getPower(), m1.getCurrentPosition(),
+            m0.getPower(), m0.getCurrentPosition(),
             m1.getPower(), m1.getCurrentPosition(),
-            m2.getPower(), m1.getCurrentPosition(),
-            m3.getPower(), m1.getCurrentPosition());
+            m2.getPower(), m2.getCurrentPosition(),
+            m3.getPower(), m3.getCurrentPosition());
     }
     
     public String getCraneTelemetry() {
@@ -328,6 +337,17 @@ public class TeamRobot
             while (System.currentTimeMillis()<endTime) {
                 double motorPowers[] = getMotorPowersForDirection(angle);
                 setMotorPowers(0.5, motorPowers, null);
+                loop();
+            }
+            
+    }
+    
+    public void waitForTime(long msec){
+        long timeStarted = System.currentTimeMillis();
+            
+            long endTime = timeStarted + msec;
+            
+            while (System.currentTimeMillis()<endTime) {
                 loop();
             }
             
