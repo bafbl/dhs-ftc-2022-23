@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Blinker;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
+import com.qualcomm.robotcore.hardware.ColorSensor;
 
 import com.qualcomm.robotcore.hardware.Gyroscope;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -46,6 +47,8 @@ public class TeamRobot
     // Gyro variables
     BNO055IMU imu;
     
+    ColorSensor color;
+    
     OpMode opMode;
 
 
@@ -81,6 +84,12 @@ public class TeamRobot
         craneServo.setPosition(CRANE_SERVO_RELEASE);
         craneTouchSensor = hardwareMap.get(TouchSensor.class, "crane_touch");
        
+        color = hardwareMap.get(ColorSensor.class, "color");
+        color.enableLed(false);
+
+        opMode.telemetry.addData("Drive: ", "%s", this::getDriveTelemetry);
+        opMode.telemetry.addData("Color:", "%s", this::getColorTelemetry);
+        
         opMode.telemetry.addData("Crane:", "%s", this::getCraneTelemetry);
 
         // Initialize IMU/Gyro
@@ -113,6 +122,11 @@ public class TeamRobot
             if (craneLiftMotor.getPower() >= 0 && !canCraneGoUp())
                 craneStop();
         }        
+    }
+    
+    public String getColorTelemetry() {
+        return String.format("R:%3d G:%3d B:%3d", 
+            color.red(), color.green(), color.blue());
     }
     
     public void craneSetCurrentPositionAsMinimum() {
@@ -197,6 +211,28 @@ public class TeamRobot
         
     }
     
+    public void movecrantoposition(int height_inches)
+    {
+        int height_ticks = (int) (185.5 * height_inches) ; 
+        if(height_ticks == 0){
+            craneDown();
+            while(craneTouchSensor.isPressed()==false)
+                loop();
+            craneStop();
+        }
+        else if(getCraneHeight() > height_ticks){
+            craneDown();
+            while(getCraneHeight() > height_ticks)
+                loop();
+            craneStop();
+        } else {
+            craneUp();
+            while(getCraneHeight() < height_ticks)
+                loop();
+            craneStop();
+        }
+    }
+    
     //USE : returns list of unscaled moter powers (must in put quadrant)
     //GOAL : Shouldn't consider the quadrant
     public double[] getPowerRatiosInQuadrant(double angleIntoQuadrant, double zeroDegPowers[], double ninetyDegPowers[])
@@ -264,6 +300,14 @@ public class TeamRobot
         {
             driveMotors[i].setPower(tempMotorPowers[i]);
         }
+    }
+    
+    public String getDriveTelemetry() {
+        return String.format("M0: %.2f@%5d, M1: %.2f@%5d, M2: %.2f@%5d, M3: %.2f@%5d",
+            m0.getPower(), m1.getCurrentPosition(),
+            m1.getPower(), m1.getCurrentPosition(),
+            m2.getPower(), m1.getCurrentPosition(),
+            m3.getPower(), m1.getCurrentPosition());
     }
     
     public String getCraneTelemetry() {
