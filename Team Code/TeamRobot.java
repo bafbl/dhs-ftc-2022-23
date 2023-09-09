@@ -15,12 +15,18 @@ import com.qualcomm.hardware.bosch.BNO055IMU;
 
 public class TeamRobot 
 {
-    private static double CRANE_SERVO_GRAB=0.75;
-    private static double CRANE_SERVO_RELEASE=0.90;
+    private static int CRANE_MAXIMUM_HEIGHT = 4270;
+    int craneLiftMotor_minPositionSeen;
+    boolean craneOverride=false;
+    private static double CRANE_MOVEMENT_SPEED_UP = 0.7;
+    private static double CRANE_MOVEMENT_SPEED_DOWN = 0.5;
+    private static double CRANE_SERVO_GRAB = 0.75;
+    private static double CRANE_SERVO_RELEASE = 0.90;
     
     private Blinker expansion_Hub_1;
     //private Gyroscope imu;
     private DcMotor craneLiftMotor;
+    private DcMotor craneLowerMoter;
     private DcMotor m0;
     private DcMotor m1;
     private DcMotor m2;
@@ -40,10 +46,108 @@ public class TeamRobot
     OpMode opMode;
 
 
-    public void loop() {
+    public TeamRobot(OpMode opMode)
+    {
+        this.opMode = opMode;
+        HardwareMap hardwareMap = opMode.hardwareMap;
+        m0 = hardwareMap.dcMotor.get("m0");
+        m1 = hardwareMap.dcMotor.get("m1");
+        m1.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        m2 = hardwareMap.dcMotor.get("m2");
+        m2.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        m3 = hardwareMap.dcMotor.get("m3");
+       
+        m0.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        m1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        m2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        m3.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        
+        driveMotors = new DcMotor[] {m0, m1, m2, m3};
+
+        craneLiftMotor = hardwareMap.dcMotor.get("crane_lift");
+        craneLiftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        craneLiftMotor_minPositionSeen = craneLiftMotor.getCurrentPosition();
+        
+        craneLowerMoter = hardwareMap.dcMotor.get("crane_lower");
+        craneLowerMoter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        craneServo = hardwareMap.servo.get("Crane_Servo");
+        craneServo.setPosition(CRANE_SERVO_RELEASE);
+       
+        opMode.telemetry.addData("Crane:", "%s", this::getCraneTelemetry);
+
+        // Initialize IMU/Gyro
+        imu = hardwareMap.get(BNO055IMU.class, "imu");
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
+        parameters.accelUnit = BNO055IMU.AccelUnit.METERS_PERSEC_PERSEC;
+        parameters.loggingEnabled = true;
+        parameters.loggingTag = "IMU";
+        imu.initialize(parameters);
+        _getAngle1FromImu();
+      //  opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
+    }
+
+
+    public void loop()
+    {
         opMode.telemetry.update();
+        
+        if (craneLiftMotor.getCurrentPosition() < craneLiftMotor_minPositionSeen)
+            craneLiftMotor_minPositionSeen = craneLiftMotor.getCurrentPosition();
+            
+        if ( ! craneOverride ) {
+            if (craneLiftMotor.getPower() <= 0 && craneLiftMotor.getCurrentPosition() <= craneLiftMotor_minPositionSeen) {
+                craneStop();
+            }
+            
+            if (craneLiftMotor.getPower() >= 0 && craneLiftMotor.getCurrentPosition() >= craneLiftMotor_minPositionSeen+CRANE_MAXIMUM_HEIGHT) {
+                craneStop();
+            }
+        }        
     }
     
+    public void craneUp()
+    {
+        craneLiftMotor.setPower(CRANE_MOVEMENT_SPEED_UP);
+        craneLowerMoter.setPower(0.2);
+        
+    }
+    
+    public void craneDown(boolean overide)
+    {
+        craneOverride=overide;
+        
+        if (overide == true) {
+            craneLiftMotor.setPower(-0.1);
+            craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN/2);
+            return;
+        }
+        
+        craneLiftMotor.setPower(-0.2);
+        craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN);
+        
+    }
+    
+    public void craneStop()
+    {
+        craneLiftMotor.setPower(0);
+        craneLowerMoter.setPower(0);
+    }
+    
+    public void craneServoGrab()
+    {
+        craneServo.setPosition(CRANE_SERVO_GRAB);
+        
+    }
+    
+    public void craneServoRelease()
+    {
+        craneServo.setPosition(CRANE_SERVO_RELEASE);
+        
+    }
     
     //USE : returns list of unscaled moter powers (must in put quadrant)
     //GOAL : Shouldn't consider the quadrant
@@ -115,9 +219,11 @@ public class TeamRobot
     }
     
     public String getCraneTelemetry() {
-        return String.format("Pow=%4.2f|@%4d| Claw:%s (%.2f)",
+        return String.format("Pow: up%4.2f@%4d down:%4.2f@%4d| Claw:%s (%.2f)",
             craneLiftMotor.getPower(),
             craneLiftMotor.getCurrentPosition(),
+            craneLowerMoter.getPower(),
+            craneLowerMoter.getCurrentPosition(),
             craneServo.getPosition()==CRANE_SERVO_GRAB ? "Grab" : "Release",
             craneServo.getPosition());
     }
@@ -151,46 +257,6 @@ public class TeamRobot
             _getAngle1FromImu(),
             _getAngle2FromImu(),
             _getAngle3FromImu());
-    }
-
-    public TeamRobot(OpMode opMode)
-    {
-        this.opMode = opMode;
-        HardwareMap hardwareMap = opMode.hardwareMap;
-        m0 = hardwareMap.dcMotor.get("m0");
-        m1 = hardwareMap.dcMotor.get("m1");
-        m1.setDirection(DcMotorSimple.Direction.REVERSE);
-
-        m2 = hardwareMap.dcMotor.get("m2");
-        m2.setDirection(DcMotorSimple.Direction.REVERSE);
-
-        m3 = hardwareMap.dcMotor.get("m3");
-       
-        m0.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        m1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        m2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        m3.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        
-        driveMotors = new DcMotor[] {m0, m1, m2, m3};
-
-        craneLiftMotor = hardwareMap.dcMotor.get("crane_lift");
-        craneLiftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        craneServo = hardwareMap.servo.get("Crane_Servo");
-        craneServo.setPosition(CRANE_SERVO_RELEASE);
-       
-     //  opMode.telemetry.addData("Crane:", "%s", this::getCraneTelemetry);
-
-        // Initialize IMU/Gyro
-        imu = hardwareMap.get(BNO055IMU.class, "imu");
-        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
-        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
-        parameters.accelUnit = BNO055IMU.AccelUnit.METERS_PERSEC_PERSEC;
-        parameters.loggingEnabled = true;
-        parameters.loggingTag = "IMU";
-        imu.initialize(parameters);
-        _getAngle1FromImu();
-      //  opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
     }
 
 }
