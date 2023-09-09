@@ -58,11 +58,7 @@ public class TeamRobot
         HardwareMap hardwareMap = opMode.hardwareMap;
         m0 = hardwareMap.dcMotor.get("m0");
         m1 = hardwareMap.dcMotor.get("m1");
-        m1.setDirection(DcMotorSimple.Direction.REVERSE);
-
         m2 = hardwareMap.dcMotor.get("m2");
-        m2.setDirection(DcMotorSimple.Direction.REVERSE);
-
         m3 = hardwareMap.dcMotor.get("m3");
        
         m0.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -220,14 +216,14 @@ public class TeamRobot
                 loop();
             craneStop();
         }
-        else if(getCraneHeight() > height_ticks){
+        else if(getCraneHeight() >= height_ticks){
             craneDown();
             while(getCraneHeight() > height_ticks)
                 loop();
             craneStop();
         } else {
             craneUp();
-            while(getCraneHeight() < height_ticks)
+            while(getCraneHeight() <= height_ticks)
                 loop();
             craneStop();
         }
@@ -337,6 +333,23 @@ public class TeamRobot
             
     }
     
+    private double TICKS_PER_INCH=500;
+    
+    public void moveForDistance(double angle, double distanceInInches){
+        int startPosition = m0.getCurrentPosition();
+
+        double motorPowers[] = getMotorPowersForDirection(angle);
+        setMotorPowers(0.5, motorPowers, null);
+
+        int distanceInTicks = (int) (distanceInInches * TICKS_PER_INCH);
+        
+        while (m0.getCurrentPosition() > startPosition + distanceInTicks) {
+                loop();
+        }
+        setMotorPowers(0, null, null);
+            
+    }
+
     private float _getAngle1FromImu() {
         return imu.getAngularOrientation().firstAngle;
     }
