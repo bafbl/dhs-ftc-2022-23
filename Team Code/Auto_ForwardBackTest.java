@@ -1,11 +1,12 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 @Autonomous
-
-public class Auto1_right extends LinearOpMode {
+@Disabled
+public class Auto_ForwardBackTest extends LinearOpMode {
 
     TeamRobot robot;
     // todo: write your code here
@@ -20,11 +21,13 @@ public class Auto1_right extends LinearOpMode {
         
         while (!isStopRequested())
         {
-            robot.spikeGrab();
-            robot.movecrantoposition(6);
-            
-            
-            break;
+           robot.moveForTime (90,10000);
+           robot.stop();
+           robot.waitForTime(500);
+           // This was a syntax error, and needs to be fixed
+            //robot.turnForAngle(180);
+            robot.stop();
+            robot.waitForTime(500);
             
         }
        

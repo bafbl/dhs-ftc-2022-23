@@ -22,7 +22,7 @@ public class Auto2_DeliverConeLeft extends LinearOpMode {
         while (!isStopRequested())
         {
             // grab and lift cone
-            robot.craneServoGrab();
+            robot.spikeGrab();
             robot.movecrantoposition(15);
             // move into dropping position
             robot.moveForTime(0, 8500/12);
@@ -31,7 +31,7 @@ public class Auto2_DeliverConeLeft extends LinearOpMode {
             robot.setMotorPowers(0, null, null);
             robot.movecrantoposition(13);
             robot.waitForTime(1000);
-            robot.craneServoRelease();
+            robot.spikeRelease();
             robot.waitForTime(1000);
             // move back, to the side, and forward to park
             robot.moveForTime(270, 500);

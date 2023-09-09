@@ -22,7 +22,7 @@ public class Auto3_DeliverConeRight extends LinearOpMode {
         {
             // grab and lift cone
             robot.movecrantoposition(1);
-            robot.craneServoGrab();
+            robot.spikeGrab();
             robot.waitForTime(250);
             robot.movecrantoposition(15);
             // move into dropping position
@@ -32,15 +32,15 @@ public class Auto3_DeliverConeRight extends LinearOpMode {
             robot.setMotorPowers(0, null, null);
             robot.movecrantoposition(13);
             robot.waitForTime(1000);
-            robot.craneServoRelease();
+            robot.spikeRelease();
             robot.waitForTime(500);
-            robot.craneServoGrab();
+            robot.spikeGrab();
             robot.waitForTime(100);
-            robot.craneServoRelease();
+            robot.spikeRelease();
             robot.waitForTime(100);
-            robot.craneServoGrab();
+            robot.spikeGrab();
             robot.waitForTime(1000);
-            robot.craneServoRelease();
+            robot.spikeRelease();
             robot.movecrantoposition(16);
             robot.moveForTime(270, 1000);
             robot.stop();

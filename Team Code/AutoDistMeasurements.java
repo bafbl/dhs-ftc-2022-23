@@ -5,11 +5,10 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 @Autonomous
 
-public class Auto1_right extends LinearOpMode {
+public class AutoDistMeasurements extends LinearOpMode {
 
     TeamRobot robot;
-    // todo: write your code here
-    public void runOpMode()
+    public void runOpMode() 
     {
         robot = new TeamRobot(this);
 
@@ -18,15 +17,9 @@ public class Auto1_right extends LinearOpMode {
            robot.loop();
         }
         
-        while (!isStopRequested())
-        {
-            robot.spikeGrab();
-            robot.movecrantoposition(6);
-            
-            
-            break;
-            
-        }
-       
+        robot.moveForDistance(90, 10, 0);
+        robot.stop();
+        robot.waitForTime(100000);
+        
     }
 }

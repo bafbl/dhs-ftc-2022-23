@@ -22,7 +22,7 @@ public class Auto1_left extends LinearOpMode {
         while (!isStopRequested())
         {
             // picks up crane
-            robot.craneServoGrab();
+            robot.spikeGrab();
             robot.movecrantoposition(6);
             //moves to left terminal
             robot.moveForTime(180, 2*1000);

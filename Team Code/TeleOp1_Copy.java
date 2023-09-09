@@ -14,10 +14,9 @@ import com.qualcomm.hardware.bosch.BNO055IMU;
 
 @TeleOp
 
-public class TeleOp1 extends LinearOpMode
+public class TeleOp1_Copy extends LinearOpMode
 {
     private TeamRobot robot;
-    double previousCraneControlPosition = 0;
     //USE : returns moter power scale
     double getPowerScale(double joystickX, double joystickY)
     {
@@ -124,19 +123,7 @@ public class TeleOp1 extends LinearOpMode
                 robot.spikeGrab();
             if(gamepad2.x)
                 robot.spikeRelease();
-            
-            if(gamepad2.left_trigger > 0.2)
-                robot.closePaws();
-            else
-                robot.openPaws();
-            
-            
-            if (previousCraneControlPosition < 0.2 && gamepad2.right_trigger > 0.2) 
-              robot.spike_switchPosition();
-            previousCraneControlPosition = gamepad2.right_trigger;
-            
-            if (gamepad2.dpad_down && !robot.whisker.isPressed())
-              robot.spikeRelease();
+                
         }
        
     }
