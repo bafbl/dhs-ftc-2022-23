@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Blinker;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.TouchSensor;
 
 import com.qualcomm.robotcore.hardware.Gyroscope;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -22,18 +23,17 @@ public class TeamRobot
     private static double CRANE_MOVEMENT_SPEED_DOWN = 0.5;
     private static double CRANE_SERVO_GRAB = 0.75;
     private static double CRANE_SERVO_RELEASE = 0.90;
-    
-    private Blinker expansion_Hub_1;
-    //private Gyroscope imu;
+    private Servo craneServo;
     private DcMotor craneLiftMotor;
     private DcMotor craneLowerMoter;
+    private TouchSensor craneTouchSensor;
+
     private DcMotor m0;
     private DcMotor m1;
     private DcMotor m2;
     private DcMotor m3;
     private DcMotor driveMotors[];
     
-    private Servo craneServo;
    
     double forwardPowers[] = new double[] {-1.0, -1.0, +1.0, +1.0};
     double backwardPowers[] = new double[] {+1.0, +1.0, -1.0, -1.0};
@@ -69,12 +69,14 @@ public class TeamRobot
         craneLiftMotor = hardwareMap.dcMotor.get("crane_lift");
         craneLiftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         craneLiftMotor_minPositionSeen = craneLiftMotor.getCurrentPosition();
+        craneLiftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         
         craneLowerMoter = hardwareMap.dcMotor.get("crane_lower");
         craneLowerMoter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         craneServo = hardwareMap.servo.get("Crane_Servo");
         craneServo.setPosition(CRANE_SERVO_RELEASE);
+        craneTouchSensor = hardwareMap.get(TouchSensor.class, "crane_touch");
        
         opMode.telemetry.addData("Crane:", "%s", this::getCraneTelemetry);
 
@@ -96,36 +98,65 @@ public class TeamRobot
         opMode.telemetry.update();
         
         if (craneLiftMotor.getCurrentPosition() < craneLiftMotor_minPositionSeen)
-            craneLiftMotor_minPositionSeen = craneLiftMotor.getCurrentPosition();
+            craneSetCurrentPositionAsMinimum();
             
         if ( ! craneOverride ) {
-            if (craneLiftMotor.getPower() <= 0 && craneLiftMotor.getCurrentPosition() <= craneLiftMotor_minPositionSeen) {
+            if (craneLiftMotor.getPower() <= 0 && !canCraneGoDown())
                 craneStop();
-            }
             
-            if (craneLiftMotor.getPower() >= 0 && craneLiftMotor.getCurrentPosition() >= craneLiftMotor_minPositionSeen+CRANE_MAXIMUM_HEIGHT) {
+            if (craneLiftMotor.getPower() >= 0 && !canCraneGoUp())
                 craneStop();
-            }
         }        
     }
     
-    public void craneUp()
+    public void craneSetCurrentPositionAsMinimum() {
+        craneLiftMotor_minPositionSeen = craneLiftMotor.getCurrentPosition();
+    }
+    
+    public int getCraneHeight() {
+        return craneLiftMotor.getCurrentPosition() - craneLiftMotor_minPositionSeen;
+    }
+    
+    public boolean canCraneGoDown() {
+        if (craneTouchSensor.isPressed())
+            return false;
+        return getCraneHeight() > 0;
+    }
+    
+    public boolean canCraneGoUp() {
+        return getCraneHeight() < CRANE_MAXIMUM_HEIGHT;
+    }
+    
+    public void craneUp(boolean override)
     {
+        craneOverride=override;
+        if (override == true) {
+            craneLiftMotor.setPower(CRANE_MOVEMENT_SPEED_UP/2);
+            craneLowerMoter.setPower(0.1);
+            return;
+        }
+        
+        if (!canCraneGoUp())
+            return;
+            
         craneLiftMotor.setPower(CRANE_MOVEMENT_SPEED_UP);
         craneLowerMoter.setPower(0.2);
         
     }
     
-    public void craneDown(boolean overide)
+    public void craneDown(boolean override)
     {
-        craneOverride=overide;
+        craneOverride=override;
         
-        if (overide == true) {
+        if (override == true) {
             craneLiftMotor.setPower(-0.1);
             craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN/2);
             return;
         }
-        
+
+        if (!canCraneGoDown())
+            return;
+            
         craneLiftMotor.setPower(-0.2);
         craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN);
         
@@ -219,11 +250,15 @@ public class TeamRobot
     }
     
     public String getCraneTelemetry() {
-        return String.format("Pow: up%4.2f@%4d down:%4.2f@%4d| Claw:%s (%.2f)",
-            craneLiftMotor.getPower(),
+        return String.format("Pos:[%4d-%4d-%4d] h=%4d touch:%s|Pow: up%4.2f down:%4.2f override:%s|Claw:%s (%.2f)",
+            craneLiftMotor_minPositionSeen,
             craneLiftMotor.getCurrentPosition(),
+            craneLiftMotor_minPositionSeen+CRANE_MAXIMUM_HEIGHT,
+            getCraneHeight(),
+            craneTouchSensor.isPressed() ? "Pressed  " : "Unpressed",
+            craneLiftMotor.getPower(),
             craneLowerMoter.getPower(),
-            craneLowerMoter.getCurrentPosition(),
+            craneOverride ? "Y" : "N",
             craneServo.getPosition()==CRANE_SERVO_GRAB ? "Grab" : "Release",
             craneServo.getPosition());
     }

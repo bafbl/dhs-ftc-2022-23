@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import java.util.Arrays;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -46,6 +47,30 @@ public class TeleOp1 extends LinearOpMode
         return angleInDegrees;
     }
 
+    public void driveRobotFromGamepad(Gamepad gamepad, double powerScale) {
+        double joystickY = -gamepad.left_stick_y;
+        double joystickX = gamepad.left_stick_x;
+            
+        boolean fastMode = gamepad.right_bumper;
+            
+        double directionPowers[] = robot.getMotorPowersForDirection(getAngleInDegrees(joystickX, joystickY));
+        double spinControl = gamepad.right_stick_x;
+            
+        double spinPowers[] = new double[] {-spinControl, -spinControl, -spinControl, -spinControl};
+            
+        double joystickSpeed = getPowerScale(joystickX, joystickY);
+            
+        double speed;
+            
+        if (fastMode)
+          speed = powerScale * joystickSpeed;
+        else 
+          speed = powerScale * 0.5 * joystickSpeed;
+            
+        //Run
+        robot.setMotorPowers(speed, directionPowers, spinPowers );  
+    }
+    
     //USE : init
     public void runOpMode()
     {
@@ -59,40 +84,30 @@ public class TeleOp1 extends LinearOpMode
         while (!isStopRequested())
         {
             robot.loop();
-            //Controller Configure
-            
-            double joystickY = -gamepad1.left_stick_y;
-            double joystickX = gamepad1.left_stick_x;
-            
-            boolean fastMode = gamepad1.right_bumper;
-            
-            double directionPowers[] = robot.getMotorPowersForDirection(getAngleInDegrees(joystickX, joystickY));
-            double spinControl = gamepad1.right_stick_x;
-            
-            double spinPowers[] = new double[] {-spinControl, -spinControl, -spinControl, -spinControl};
-            
-            double joystickSpeed = getPowerScale(joystickX, joystickY);
-            
-            double speed;
-            
-            if (fastMode)
-              speed = joystickSpeed;
-            else 
-              speed = 0.5 * joystickSpeed;
-            
-            
-            //Run
-            robot.setMotorPowers(speed, directionPowers, spinPowers );  
+
+
+            // If gamepad2 is being used, drive the robot from it
+            if ( Math.abs(gamepad2.left_stick_y) > 0.1 
+              || Math.abs(gamepad2.left_stick_x) > 0.1
+              || Math.abs(gamepad2.right_stick_x)> 0.1
+              || Math.abs(gamepad2.right_stick_y)> 0.1 )
+            {
+                driveRobotFromGamepad(gamepad2, 0.5);
+            }
+            else // Drive the robot from gamepad1
+            {
+                driveRobotFromGamepad(gamepad1, 1.0);
+            }
             
             if(gamepad2.y)
-            {
-              robot.craneUp();
-              //System.out.println("yes");
-            }
+              robot.craneUp(gamepad2.right_bumper);
             else if(gamepad2.a)
               robot.craneDown(gamepad2.right_bumper);
             else
               robot.craneStop();
+              
+            if ( gamepad2.left_bumper )
+              robot.craneSetCurrentPositionAsMinimum();
               
             if(gamepad2.b)
                 robot.craneServoGrab();
