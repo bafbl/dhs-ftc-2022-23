@@ -52,6 +52,13 @@ public class TeamRobot
     // Gyro variables
     BNO055IMU imu;
     
+    // Forward is zero, 360, etc
+    double totalDegreesTurned=0;
+
+    // Remember the previous direction so we know how much we turned
+    double previousDirection=0;
+
+
     NormalizedColorSensor colorSensor;
     NormalizedRGBA colors;
     final float[] hsvValues = new float[3];
@@ -104,7 +111,7 @@ public class TeamRobot
         parameters.loggingTag = "IMU";
         imu.initialize(parameters);
         _getAngle1FromImu();
-      //  opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
+        opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
     }
 
 
@@ -124,14 +131,32 @@ public class TeamRobot
             
             if (craneLiftMotor.getPower() >= 0 && !canCraneGoUp())
                 craneStop();
-        }        
+        }       
+        
+        double newDirection = _getAngle1FromImu();
+        // TODO:
+        // ... use newDirection and previousDirection and wrap-around
+        // to update totalDegreesTurned
+        
+        previousDirection = newDirection;
     }
     
     public String getColorTelemetry() {
         colors = colorSensor.getNormalizedColors();
         Color.colorToHSV(colors.toColor(), hsvValues);
-        return String.format("\nRed: %4.3f Gre: %4.3f Blu: %4.3f \nHue: %4.1f Sat: %4.3f Val: %4.3f \nAlf: %4.3f", 
-            colors.red, colors.green, colors.blue, hsvValues[0], hsvValues[1], hsvValues[2], colors.alpha);
+        return String.format("\nRed: %4.3f Gre: %4.3f Blu: %4.3f \nHue: %4.1f Sat: %4.3f Val: %4.3f \nAlf: %4.3f\nZone: %d", 
+            colors.red, colors.green, colors.blue, hsvValues[0], hsvValues[1], hsvValues[2], colors.alpha, findParkingZone());
+    }
+    
+    public int findParkingZone() {
+        colors = colorSensor.getNormalizedColors();
+        Color.colorToHSV(colors.toColor(), hsvValues);
+        double red = colors.red, blue = colors.blue, green = colors.green;
+        if (red + blue + green > 2) 
+            return 3;
+        if (red > blue) 
+            return 2;
+        return 1;
     }
     
     public void craneSetCurrentPositionAsMinimum() {
@@ -329,17 +354,49 @@ public class TeamRobot
             craneServo.getPosition());
     }
     
-    public void moveForTime(double angle, long msec){
+    public void moveForTime(double angle, long msec, double power){
         long timeStarted = System.currentTimeMillis();
             
             long endTime = timeStarted + msec;
             
             while (System.currentTimeMillis()<endTime) {
                 double motorPowers[] = getMotorPowersForDirection(angle);
-                setMotorPowers(0.5, motorPowers, null);
+                setMotorPowers(power, motorPowers, null);
                 loop();
             }
             
+    }
+    
+    public void moveForTime(double angle, long msec){
+        moveForTime(angle, msec, 0.5);
+    }
+    
+    public void spin(double spinPower) {
+        setMotorPowers(spinPower, null, new double[] {1,1,1,1});
+    }
+    
+    public void turnForAngle(double turnAngle, double turnSpeed){
+        double startAngle = getRobotAngle();
+        if (turnAngle < 0) {
+            turnSpeed = turnSpeed * -1;
+        }
+        spin(turnSpeed);
+        double sum = 0;
+        while (sum < Math.abs(turnAngle)) {
+            loop();
+            double currentAngle = getRobotAngle();
+            if (currentAngle < 0) {
+                currentAngle *= -1;
+            }
+            sum += Math.abs(startAngle - currentAngle);
+            startAngle = currentAngle;
+            
+        }
+            
+    }
+    
+    public void stop() {
+        setMotorPowers(0, null, null);
     }
     
     public void waitForTime(long msec){
@@ -381,11 +438,40 @@ public class TeamRobot
         return imu.getAngularOrientation().thirdAngle;
     }
     
+    // [0,360) where 0 is 'North', 90 is 'West', 180 is 'South' and 270 is 'East'
+    // North is defined to be the direction the robot was facing when it started
+    // or reset to
+    public double getHeading() {
+        double heading=totalDegreesTurned % 360;
+        if ( heading>=0 )
+            return heading;
+        else
+            return heading+360;
+    }
+    
+    public void resetHeading_North() {
+    }
+    
+    public void resetHeading_South() {
+    }
+    
+    public void resetHeading_East() {
+    }
+    
+    public void resetHeading_West() {
+    }
+    
     public String getImuTelemetry() {
-        return String.format("A1=%.2f | A2=%.2f | A3=%.2f",
+        return String.format("TotalDegreesTurned=%+.0f | Heading=%.0f | A1=%.1f | A2=%.1f | A3=%.1f",
+            totalDegreesTurned,
+            getHeading(),
             _getAngle1FromImu(),
             _getAngle2FromImu(),
             _getAngle3FromImu());
     }
 
+    public double getRobotAngle() {
+        return _getAngle1FromImu();
+        
+    }
 }

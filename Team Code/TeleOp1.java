@@ -54,7 +54,7 @@ public class TeleOp1 extends LinearOpMode
         boolean fastMode = gamepad.right_bumper;
             
         double directionPowers[] = robot.getMotorPowersForDirection(getAngleInDegrees(joystickX, joystickY));
-        double spinControl = gamepad.right_stick_x * spinPowerScale;
+        double spinControl = gamepad.right_stick_x * spinPowerScale * (fastMode ? 1.0 : 0.5);
             
         double spinPowers[] = new double[] {-spinControl, -spinControl, -spinControl, -spinControl};
             
@@ -98,6 +98,15 @@ public class TeleOp1 extends LinearOpMode
             {
                 driveRobotFromGamepad(gamepad1, 1.0, 1.0);
             }
+            
+            if ( gamepad1.dpad_up )
+              robot.resetHeading_North();
+            else if (gamepad1.dpad_left )
+              robot.resetHeading_West();
+            else if (gamepad1.dpad_down )
+              robot.resetHeading_South();
+            else if (gamepad1.dpad_right )
+              robot.resetHeading_East();
             
             robot.setCraneOverride(gamepad2.right_bumper);
             if(gamepad2.y)
