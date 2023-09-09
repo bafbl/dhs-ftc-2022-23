@@ -9,6 +9,7 @@ public class Auto1_left extends LinearOpMode {
 
     TeamRobot robot;
     // todo: write your code here
+    // first league match
     public void runOpMode()
     {
         robot = new TeamRobot(this);
@@ -20,10 +21,13 @@ public class Auto1_left extends LinearOpMode {
         
         while (!isStopRequested())
         {
+            // picks up crane
             robot.craneServoGrab();
             robot.movecrantoposition(6);
+            //moves to left terminal
             robot.moveForTime(180, 2*1000);
-    
+            
+            //stops the robot
             robot.setMotorPowers(0, null, null);
             robot.movecrantoposition(1);
             break;

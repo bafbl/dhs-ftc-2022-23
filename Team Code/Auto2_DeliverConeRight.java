@@ -9,6 +9,7 @@ public class Auto2_DeliverConeRight extends LinearOpMode {
 
     TeamRobot robot;
     // todo: write your code here
+    // 11/19 league match
     public void runOpMode()
     {
         robot = new TeamRobot(this);
@@ -22,8 +23,10 @@ public class Auto2_DeliverConeRight extends LinearOpMode {
         {
             robot.craneServoGrab();
             robot.movecrantoposition(15);
+            robot.moveForTime(180, 8500/12);
             robot.moveForTime(90, 750);
             robot.setMotorPowers(0, null, null);
+            robot.movecrantoposition(13);
             robot.waitForTime(1000);
             robot.craneServoRelease();
             robot.waitForTime(1000);

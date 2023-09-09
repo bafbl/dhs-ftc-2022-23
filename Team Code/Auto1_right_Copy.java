@@ -5,7 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 @Autonomous
 
-public class Auto1_right extends LinearOpMode {
+public class Auto1_right_Copy extends LinearOpMode {
 
     TeamRobot robot;
     // todo: write your code here
@@ -20,10 +20,8 @@ public class Auto1_right extends LinearOpMode {
         
         while (!isStopRequested())
         {
-            robot.craneServoGrab();
-            robot.movecrantoposition(6);
-            
-            
+            robot.turnForAngle(90, 0.1);
+            robot.waitForTime(30000);
             break;
             
         }

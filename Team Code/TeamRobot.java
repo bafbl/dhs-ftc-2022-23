@@ -63,10 +63,12 @@ public class TeamRobot
     NormalizedRGBA colors;
     final float[] hsvValues = new float[3];
     
-    OpMode opMode;
+    LinearOpMode opMode;
+    
+    String loopStatus = null;
 
 
-    public TeamRobot(OpMode opMode)
+    public TeamRobot(LinearOpMode opMode)
     {
         this.opMode = opMode;
         HardwareMap hardwareMap = opMode.hardwareMap;
@@ -112,9 +114,23 @@ public class TeamRobot
         imu.initialize(parameters);
         _getAngle1FromImu();
         opMode.telemetry.addData("IMU: ", "%s", this::getImuTelemetry);
+        
+        opMode.telemetry.addData("Loop status", "%s", this::getLoopStatusMessage);
+    }
+
+    public String getLoopStatusMessage() {
+        if (loopStatus==null )
+            return "none";
+        else
+            return loopStatus;
     }
 
 
+    public void loopWhileWaiting(String messageFormat, Object... args){
+        loopStatus = String.format(messageFormat, args);
+        loop();
+    }
+    
     public void loop()
     {
         opMode.telemetry.update();
@@ -146,6 +162,12 @@ public class TeamRobot
         previousDirection = currentDirection;
     }
     
+    public boolean shouldRobotBeRunning() {
+        if (opMode.isStopRequested())
+            return false;
+        else
+            return true;
+    }
     public String getColorTelemetry() {
         colors = colorSensor.getNormalizedColors();
         Color.colorToHSV(colors.toColor(), hsvValues);
@@ -157,7 +179,7 @@ public class TeamRobot
         colors = colorSensor.getNormalizedColors();
         Color.colorToHSV(colors.toColor(), hsvValues);
         double red = colors.red, blue = colors.blue, green = colors.green;
-        if (red + blue + green > 2) 
+        if (red + blue + green > 1) 
             return 3;
         if (red > blue) 
             return 2;
@@ -246,26 +268,31 @@ public class TeamRobot
         
     }
     
-    public void movecrantoposition(int height_inches)
+    public void movecrantoposition(double height_inches)
     {
         int height_ticks = (int) (185.5 * height_inches) ; 
         if(height_ticks == 0){
             craneDown();
-            while(craneTouchSensor.isPressed()==false)
-                loop();
+            while(shouldRobotBeRunning() && craneTouchSensor.isPressed()==false)
+                loopWhileWaiting("Moving elevator to %.2f inches, waiting for press", 
+                    height_inches);
+                
             craneStop();
         }
         else if(getCraneHeight() >= height_ticks){
             craneDown();
-            while(getCraneHeight() > height_ticks)
-                loop();
+            while(shouldRobotBeRunning() && getCraneHeight() > height_ticks)
+                loopWhileWaiting("Moving elevator to %.2f inches, %d clicks left", 
+                    height_inches, getCraneHeight()-height_ticks);
             craneStop();
         } else {
             craneUp();
-            while(getCraneHeight() <= height_ticks)
-                loop();
+            while(shouldRobotBeRunning() && getCraneHeight() <= height_ticks)
+                loopWhileWaiting("Moving elevator to %.2f inches, %d clicks left", 
+                    height_inches, height_ticks-getCraneHeight());
             craneStop();
         }
+        loopStatus = null;
     }
     
     //USE : returns list of unscaled moter powers (must in put quadrant)
@@ -364,11 +391,15 @@ public class TeamRobot
             
             long endTime = timeStarted + msec;
             
-            while (System.currentTimeMillis()<endTime) {
+            while (shouldRobotBeRunning() && System.currentTimeMillis()<endTime) {
                 double motorPowers[] = getMotorPowersForDirection(angle);
                 setMotorPowers(power, motorPowers, null);
-                loop();
+                loopWhileWaiting("Moving for %.2f seconds in direction %.0f, pow=%.2f. %.2f seconds left", 
+                    1.0 * msec/1000, angle, power,
+                    1.0*endTime-System.currentTimeMillis());
+                
             }
+            loopStatus=null;
             
     }
     
@@ -377,7 +408,7 @@ public class TeamRobot
     }
     
     public void spin(double spinPower) {
-        setMotorPowers(spinPower, null, new double[] {1,1,1,1});
+        setMotorPowers(spinPower, null, new double[] {spinPower,spinPower,spinPower,spinPower});
     }
     
     public void turnForAngle(double turnAngle, double turnSpeed){
@@ -387,7 +418,7 @@ public class TeamRobot
             turnSpeed = turnSpeed * -1;
         }
         spin(turnSpeed);
-        while (Math.abs(totalDegreesTurned - startAngle) < Math.abs(turnAngle))
+        while (shouldRobotBeRunning() && Math.abs(totalDegreesTurned - startAngle) < Math.abs(turnAngle))
             loop();
             
     }
@@ -401,10 +432,13 @@ public class TeamRobot
             
             long endTime = timeStarted + msec;
             
-            while (System.currentTimeMillis()<endTime) {
+            while (shouldRobotBeRunning() && System.currentTimeMillis()<endTime) {
                 loop();
+                loopWhileWaiting("Waiting for %.2f seconds. %.2f seconds left", 
+                    1.0 * msec/1000, 
+                    1.0*endTime-System.currentTimeMillis());
             }
-            
+           loopStatus = null; 
     }
     
     private double TICKS_PER_INCH=500;
@@ -417,7 +451,7 @@ public class TeamRobot
 
         int distanceInTicks = (int) (distanceInInches * TICKS_PER_INCH);
         
-        while (m0.getCurrentPosition() > startPosition + distanceInTicks) {
+        while (shouldRobotBeRunning() && m0.getCurrentPosition() > startPosition + distanceInTicks) {
                 loop();
         }
         setMotorPowers(0, null, null);
