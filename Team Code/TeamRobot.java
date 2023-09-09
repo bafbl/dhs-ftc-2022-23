@@ -16,17 +16,20 @@ import com.qualcomm.hardware.bosch.BNO055IMU;
 
 public class TeamRobot 
 {
-    private static int CRANE_MAXIMUM_HEIGHT = 4270;
-    int craneLiftMotor_minPositionSeen;
-    boolean craneOverride=false;
+    private static int CRANE_MAXIMUM_HEIGHT = 4250;
     private static double CRANE_MOVEMENT_SPEED_UP = 0.7;
-    private static double CRANE_MOVEMENT_SPEED_DOWN = 0.5;
+    private static double CRANE_OPPOSITE_SPEED_UP = 0.4;
+    private static double CRANE_MOVEMENT_SPEED_DOWN = 0.7;
+    private static double CRANE_OPPOSITE_SPEED_DOWN = 0.35;
+    
     private static double CRANE_SERVO_GRAB = 0.75;
     private static double CRANE_SERVO_RELEASE = 0.90;
     private Servo craneServo;
     private DcMotor craneLiftMotor;
     private DcMotor craneLowerMoter;
     private TouchSensor craneTouchSensor;
+    int craneLiftMotor_minPositionSeen;
+    boolean craneOverride=false;
 
     private DcMotor m0;
     private DcMotor m1;
@@ -97,8 +100,11 @@ public class TeamRobot
     {
         opMode.telemetry.update();
         
-        if (craneLiftMotor.getCurrentPosition() < craneLiftMotor_minPositionSeen)
+        if (craneTouchSensor.isPressed() 
+            || craneLiftMotor.getCurrentPosition() < craneLiftMotor_minPositionSeen)
+        {
             craneSetCurrentPositionAsMinimum();
+        }
             
         if ( ! craneOverride ) {
             if (craneLiftMotor.getPower() <= 0 && !canCraneGoDown())
@@ -127,37 +133,48 @@ public class TeamRobot
         return getCraneHeight() < CRANE_MAXIMUM_HEIGHT;
     }
     
-    public void craneUp(boolean override)
-    {
+    public void setCraneOverride(boolean override) {
         craneOverride=override;
-        if (override == true) {
+    }
+    
+    public void craneUp()
+    {
+        if (craneOverride == true) {
             craneLiftMotor.setPower(CRANE_MOVEMENT_SPEED_UP/2);
-            craneLowerMoter.setPower(0.1);
+            craneLowerMoter.setPower(CRANE_OPPOSITE_SPEED_UP/2);
             return;
         }
         
-        if (!canCraneGoUp())
+        if (!canCraneGoUp()) {
+            craneStop();
             return;
+        }
             
         craneLiftMotor.setPower(CRANE_MOVEMENT_SPEED_UP);
-        craneLowerMoter.setPower(0.2);
-        
+        craneLowerMoter.setPower(CRANE_OPPOSITE_SPEED_UP);
     }
     
-    public void craneDown(boolean override)
+    public void craneDown()
     {
-        craneOverride=override;
-        
-        if (override == true) {
-            craneLiftMotor.setPower(-0.1);
+        // Always stop if the touch sensor is pressed. Not even override can
+        // go lower
+        if (craneTouchSensor.isPressed()) {
+            craneStop();
+            return;
+        }
+            
+        if (craneOverride == true) {
+            craneLiftMotor.setPower(-CRANE_OPPOSITE_SPEED_DOWN/2);
             craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN/2);
             return;
         }
 
-        if (!canCraneGoDown())
+        if (!canCraneGoDown()) {
+            craneStop();
             return;
+        }
             
-        craneLiftMotor.setPower(-0.2);
+        craneLiftMotor.setPower(-CRANE_OPPOSITE_SPEED_DOWN);
         craneLowerMoter.setPower(-CRANE_MOVEMENT_SPEED_DOWN);
         
     }
@@ -250,7 +267,7 @@ public class TeamRobot
     }
     
     public String getCraneTelemetry() {
-        return String.format("Pos:[%4d-%4d-%4d] h=%4d touch:%s|Pow: up%4.2f down:%4.2f override:%s|Claw:%s (%.2f)",
+        return String.format("Pos:[%4d,%4d,%4d] h=%4d touch:%s|Pow: up%4.2f down:%4.2f override:%s|Claw:%s (%.2f)",
             craneLiftMotor_minPositionSeen,
             craneLiftMotor.getCurrentPosition(),
             craneLiftMotor_minPositionSeen+CRANE_MAXIMUM_HEIGHT,

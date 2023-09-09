@@ -99,10 +99,11 @@ public class TeleOp1 extends LinearOpMode
                 driveRobotFromGamepad(gamepad1, 1.0);
             }
             
+            robot.setCraneOverride(gamepad2.right_bumper);
             if(gamepad2.y)
-              robot.craneUp(gamepad2.right_bumper);
+              robot.craneUp();
             else if(gamepad2.a)
-              robot.craneDown(gamepad2.right_bumper);
+              robot.craneDown();
             else
               robot.craneStop();
               
